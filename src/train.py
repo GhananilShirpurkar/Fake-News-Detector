@@ -2,20 +2,25 @@ import os
 import pandas as pd
 import joblib
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
 
 from utils import clean_text
 
+
 # ==========================
-# Paths
+# Robust Path Handling
 # ==========================
 
-DATA_FAKE = "../data/Fake.csv"
-DATA_TRUE = "../data/True.csv"
-MODEL_DIR = "../models"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
+
+DATA_FAKE = os.path.join(PROJECT_ROOT, "data", "Fake.csv")
+DATA_TRUE = os.path.join(PROJECT_ROOT, "data", "True.csv")
+MODEL_DIR = os.path.join(PROJECT_ROOT, "models")
+
 
 # ==========================
 # Load Dataset
@@ -54,18 +59,34 @@ def train():
     vectorizer = TfidfVectorizer(
         stop_words="english",
         max_df=0.7,
-        max_features=10000
+        max_features=20000,
+        ngram_range=(1, 2)
     )
 
+    # Fit vectorizer once
     X_train_vec = vectorizer.fit_transform(X_train)
     X_test_vec = vectorizer.transform(X_test)
 
     model = LogisticRegression(max_iter=1000)
+
+    # Cross-validation (correct usage)
+    cv_scores = cross_val_score(
+        model,
+        X_train_vec,
+        y_train,
+        cv=5,
+        scoring="accuracy"
+    )
+
+    print("Cross-Validation Accuracy Scores:", cv_scores)
+    print("Mean CV Accuracy:", cv_scores.mean())
+
+    # Train final model
     model.fit(X_train_vec, y_train)
 
     predictions = model.predict(X_test_vec)
 
-    print("Accuracy:", accuracy_score(y_test, predictions))
+    print("Test Accuracy:", accuracy_score(y_test, predictions))
     print(classification_report(y_test, predictions))
 
     # Save artifacts
