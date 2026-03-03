@@ -1,5 +1,11 @@
+import os
+import joblib
+import requests
 import customtkinter as ctk
 from tkinter import messagebox
+from dotenv import load_dotenv
+from utils import clean_text
+
 
 class FakeNewsDetectionApp:
     def __init__(self, root):
@@ -7,334 +13,246 @@ class FakeNewsDetectionApp:
         self.root.title("Fake News Detection System")
         self.root.geometry("900x600")
         self.root.minsize(800, 500)
-        
-        # Set theme and colors
+
+        # Appearance
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
-        
-        # Color palette
+
+        # Load environment variables
+        load_dotenv()
+        self.api_key = os.getenv("NEWS_API_KEY")
+
+        # Paths
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        MODEL_PATH = os.path.join(BASE_DIR, "../models/model.pkl")
+        VECTORIZER_PATH = os.path.join(BASE_DIR, "../models/vectorizer.pkl")
+
+        # Load Model
+        try:
+            self.model = joblib.load(MODEL_PATH)
+            self.vectorizer = joblib.load(VECTORIZER_PATH)
+        except Exception as e:
+            messagebox.showerror("Model Load Error", f"Failed to load model:\n{str(e)}")
+            self.root.destroy()
+            return
+
+        self.is_analyzing = False
+
         self.colors = {
-            "bg_primary": "#1a1a2e",      # Deep dark blue-gray
-            "bg_secondary": "#16213e",     # Slightly lighter blue
-            "bg_card": "#0f3460",          # Card background
-            "accent_blue": "#e94560",      # Accent color (coral/red)
-            "accent_hover": "#ff6b6b",     # Hover state
-            "text_primary": "#ffffff",     # White text
-            "text_secondary": "#a0a0a0",   # Gray text
-            "success": "#00d9ff",          # Cyan for real news
-            "danger": "#e94560"            # Red for fake news
+            "bg_primary": "#1a1a2e",
+            "bg_secondary": "#16213e",
+            "bg_card": "#0f3460",
+            "accent_blue": "#e94560",
+            "accent_hover": "#ff6b6b",
+            "text_primary": "#ffffff",
+            "text_secondary": "#a0a0a0",
+            "success": "#00d9ff",
+            "danger": "#e94560"
         }
-        
-        # Configure root background
+
         self.root.configure(fg_color=self.colors["bg_primary"])
-        
-        # Configure grid weights for responsive layout
-        self.root.grid_rowconfigure(1, weight=1)  # Main content row expands
+        self.root.grid_rowconfigure(1, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
-        
-        # Initialize UI components
+
         self._create_header()
         self._create_main_content()
         self._create_status_bar()
-        
-        # Analysis state
-        self.is_analyzing = False
-        
+
+    # ==========================
+    # UI
+    # ==========================
+
     def _create_header(self):
-        """Create the top header section with title and subtitle"""
-        self.header_frame = ctk.CTkFrame(
-            self.root,
-            fg_color=self.colors["bg_secondary"],
-            corner_radius=0,
-            height=80
-        )
-        self.header_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
-        self.header_frame.grid_propagate(False)
-        
-        # Title
-        self.title_label = ctk.CTkLabel(
-            self.header_frame,
+        header = ctk.CTkFrame(self.root, fg_color=self.colors["bg_secondary"], height=80)
+        header.grid(row=0, column=0, sticky="ew")
+        header.grid_propagate(False)
+
+        ctk.CTkLabel(
+            header,
             text="Fake News Detection System",
-            font=ctk.CTkFont(family="Helvetica", size=28, weight="bold"),
+            font=ctk.CTkFont(size=28, weight="bold"),
             text_color=self.colors["text_primary"]
-        )
-        self.title_label.place(relx=0.5, rely=0.35, anchor="center")
-        
-        # Subtitle
-        self.subtitle_label = ctk.CTkLabel(
-            self.header_frame,
+        ).place(relx=0.5, rely=0.35, anchor="center")
+
+        ctk.CTkLabel(
+            header,
             text="Real-time NLP Classification",
-            font=ctk.CTkFont(family="Helvetica", size=14),
+            font=ctk.CTkFont(size=14),
             text_color=self.colors["accent_blue"]
-        )
-        self.subtitle_label.place(relx=0.5, rely=0.7, anchor="center")
-        
+        ).place(relx=0.5, rely=0.7, anchor="center")
+
     def _create_main_content(self):
-        """Create the main content area with left and right panels"""
-        self.main_frame = ctk.CTkFrame(
-            self.root,
-            fg_color=self.colors["bg_primary"],
-            corner_radius=0
-        )
-        self.main_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=20)
-        
-        # Configure main frame grid
-        self.main_frame.grid_rowconfigure(0, weight=1)
-        self.main_frame.grid_columnconfigure(0, weight=3)  # Left panel takes 3 parts
-        self.main_frame.grid_columnconfigure(1, weight=2)  # Right panel takes 2 parts
-        
-        self._create_left_panel()
-        self._create_right_panel()
-        
-    def _create_left_panel(self):
-        """Create left panel with text input"""
-        self.left_frame = ctk.CTkFrame(
-            self.main_frame,
-            fg_color=self.colors["bg_secondary"],
-            corner_radius=15,
-            border_width=0
-        )
-        self.left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-        self.left_frame.grid_rowconfigure(1, weight=1)
-        self.left_frame.grid_columnconfigure(0, weight=1)
-        
-        # Input label
-        self.input_label = ctk.CTkLabel(
-            self.left_frame,
+        main = ctk.CTkFrame(self.root, fg_color=self.colors["bg_primary"])
+        main.grid(row=1, column=0, sticky="nsew", padx=20, pady=20)
+
+        main.grid_rowconfigure(0, weight=1)
+        main.grid_columnconfigure(0, weight=3)
+        main.grid_columnconfigure(1, weight=2)
+
+        self._create_left_panel(main)
+        self._create_right_panel(main)
+
+    def _create_left_panel(self, parent):
+        left = ctk.CTkFrame(parent, fg_color=self.colors["bg_secondary"], corner_radius=15)
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        left.grid_rowconfigure(1, weight=1)
+        left.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            left,
             text="News Article Input",
-            font=ctk.CTkFont(family="Helvetica", size=16, weight="bold"),
+            font=ctk.CTkFont(size=16, weight="bold"),
             text_color=self.colors["text_primary"]
-        )
-        self.input_label.grid(row=0, column=0, sticky="w", padx=20, pady=(20, 10))
-        
-        # Text input box with placeholder
+        ).grid(row=0, column=0, sticky="w", padx=20, pady=(20, 10))
+
         self.text_input = ctk.CTkTextbox(
-            self.left_frame,
+            left,
             fg_color=self.colors["bg_primary"],
             text_color=self.colors["text_primary"],
-            font=ctk.CTkFont(family="Helvetica", size=12),
-            corner_radius=10,
-            border_width=2,
-            border_color=self.colors["bg_card"],
-            scrollbar_button_color=self.colors["accent_blue"],
-            scrollbar_button_hover_color=self.colors["accent_hover"]
+            corner_radius=10
         )
         self.text_input.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
-        
-        # Insert placeholder text
-        self.text_input.insert("1.0", "Paste news article here...")
-        self.text_input.configure(text_color=self.colors["text_secondary"])
-        
-        # Bind focus events for placeholder behavior
-        self.text_input.bind("<FocusIn>", self._on_text_focus_in)
-        self.text_input.bind("<FocusOut>", self._on_text_focus_out)
-        
-    def _create_right_panel(self):
-        """Create right panel with results and controls"""
-        self.right_frame = ctk.CTkFrame(
-            self.main_frame,
-            fg_color="transparent",
-            corner_radius=0
-        )
-        self.right_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
-        self.right_frame.grid_rowconfigure(1, weight=1)
-        self.right_frame.grid_columnconfigure(0, weight=1)
-        
-        # Result Card
-        self._create_result_card()
-        
-        # Control Buttons
-        self._create_control_buttons()
-        
-    def _create_result_card(self):
-        """Create the result display card"""
-        self.result_card = ctk.CTkFrame(
-            self.right_frame,
-            fg_color=self.colors["bg_card"],
-            corner_radius=15,
-            border_width=0
-        )
-        self.result_card.grid(row=0, column=0, sticky="new", pady=(0, 20))
-        self.result_card.grid_columnconfigure(0, weight=1)
-        
-        # Result header
-        self.result_header = ctk.CTkLabel(
-            self.result_card,
-            text="Analysis Result",
-            font=ctk.CTkFont(family="Helvetica", size=16, weight="bold"),
-            text_color=self.colors["text_primary"]
-        )
-        self.result_header.grid(row=0, column=0, sticky="w", padx=20, pady=(20, 15))
-        
-        # Prediction label
+
+    def _create_right_panel(self, parent):
+        right = ctk.CTkFrame(parent, fg_color="transparent")
+        right.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+
+        self._create_result_card(right)
+        self._create_buttons(right)
+
+    def _create_result_card(self, parent):
+        card = ctk.CTkFrame(parent, fg_color=self.colors["bg_card"], corner_radius=15)
+        card.pack(fill="x", pady=(0, 20))
+
         self.prediction_label = ctk.CTkLabel(
-            self.result_card,
+            card,
             text="Awaiting Analysis",
-            font=ctk.CTkFont(family="Helvetica", size=24, weight="bold"),
+            font=ctk.CTkFont(size=24, weight="bold"),
             text_color=self.colors["text_secondary"]
         )
-        self.prediction_label.grid(row=1, column=0, pady=(0, 5))
-        
-        # Confidence label
+        self.prediction_label.pack(pady=(25, 5))
+
         self.confidence_label = ctk.CTkLabel(
-            self.result_card,
+            card,
             text="--%",
-            font=ctk.CTkFont(family="Helvetica", size=32, weight="bold"),
+            font=ctk.CTkFont(size=32, weight="bold"),
             text_color=self.colors["text_secondary"]
         )
-        self.confidence_label.grid(row=2, column=0, pady=(0, 10))
-        
-        # Progress bar
-        self.confidence_bar = ctk.CTkProgressBar(
-            self.result_card,
-            progress_color=self.colors["accent_blue"],
-            fg_color=self.colors["bg_secondary"],
-            corner_radius=5,
-            height=10
-        )
-        self.confidence_bar.grid(row=3, column=0, sticky="ew", padx=20, pady=(0, 20))
+        self.confidence_label.pack(pady=(0, 10))
+
+        self.confidence_bar = ctk.CTkProgressBar(card, height=10)
+        self.confidence_bar.pack(fill="x", padx=20, pady=(0, 25))
         self.confidence_bar.set(0)
-        
-    def _create_control_buttons(self):
-        """Create action buttons"""
-        self.button_frame = ctk.CTkFrame(
-            self.right_frame,
-            fg_color="transparent",
-            corner_radius=0
-        )
-        self.button_frame.grid(row=1, column=0, sticky="sew")
-        self.button_frame.grid_columnconfigure(0, weight=1)
-        
-        # Analyze button
+
+    def _create_buttons(self, parent):
         self.analyze_btn = ctk.CTkButton(
-            self.button_frame,
+            parent,
             text="Analyze News",
-            font=ctk.CTkFont(family="Helvetica", size=14, weight="bold"),
-            fg_color=self.colors["accent_blue"],
-            hover_color=self.colors["accent_hover"],
-            text_color=self.colors["text_primary"],
-            corner_radius=10,
-            height=45,
-            command=self.analyze_news
+            command=self.analyze_news,
+            height=45
         )
-        self.analyze_btn.grid(row=0, column=0, sticky="ew", pady=(0, 15))
-        
-        # Fetch button
+        self.analyze_btn.pack(fill="x", pady=(0, 15))
+
         self.fetch_btn = ctk.CTkButton(
-            self.button_frame,
+            parent,
             text="Fetch Live News (API)",
-            font=ctk.CTkFont(family="Helvetica", size=14, weight="bold"),
-            fg_color=self.colors["bg_secondary"],
-            hover_color=self.colors["bg_card"],
-            text_color=self.colors["text_primary"],
-            border_width=2,
-            border_color=self.colors["accent_blue"],
-            corner_radius=10,
-            height=45,
-            command=self.fetch_live_news
+            command=self.fetch_live_news,
+            height=45
         )
-        self.fetch_btn.grid(row=1, column=0, sticky="ew")
-        
+        self.fetch_btn.pack(fill="x")
+
     def _create_status_bar(self):
-        """Create bottom status bar"""
-        self.status_frame = ctk.CTkFrame(
-            self.root,
-            fg_color=self.colors["bg_secondary"],
-            corner_radius=0,
-            height=35
-        )
-        self.status_frame.grid(row=2, column=0, sticky="ew", padx=0, pady=0)
-        self.status_frame.grid_propagate(False)
-        
-        # Status message
+        status = ctk.CTkFrame(self.root, fg_color=self.colors["bg_secondary"], height=35)
+        status.grid(row=2, column=0, sticky="ew")
+        status.grid_propagate(False)
+
         self.status_label = ctk.CTkLabel(
-            self.status_frame,
+            status,
             text="Ready",
-            font=ctk.CTkFont(family="Helvetica", size=11),
+            font=ctk.CTkFont(size=11),
             text_color=self.colors["text_secondary"]
         )
         self.status_label.place(x=20, rely=0.5, anchor="w")
-        
-        # Model accuracy display
-        self.accuracy_label = ctk.CTkLabel(
-            self.status_frame,
-            text="Model Accuracy: 94.2%",
-            font=ctk.CTkFont(family="Helvetica", size=11),
-            text_color=self.colors["success"]
-        )
-        self.accuracy_label.place(relx=0.98, rely=0.5, anchor="e")
-        
-    def _on_text_focus_in(self, event):
-        """Handle text box focus in - clear placeholder"""
-        current_text = self.text_input.get("1.0", "end-1c")
-        if current_text == "Paste news article here...":
-            self.text_input.delete("1.0", "end")
-            self.text_input.configure(text_color=self.colors["text_primary"])
-            
-    def _on_text_focus_out(self, event):
-        """Handle text box focus out - restore placeholder if empty"""
-        current_text = self.text_input.get("1.0", "end-1c").strip()
-        if not current_text:
-            self.text_input.delete("1.0", "end")
-            self.text_input.insert("1.0", "Paste news article here...")
-            self.text_input.configure(text_color=self.colors["text_secondary"])
-            
-    def analyze_news(self):
-        """
-        Placeholder function for news analysis logic.
-        Integrate your NLP model here.
-        """
-        if self.is_analyzing:
-            return
-            
-        text_content = self.text_input.get("1.0", "end-1c").strip()
-        if text_content == "Paste news article here..." or not text_content:
-            messagebox.showwarning("Input Required", "Please enter a news article to analyze.")
-            return
-            
-        self.is_analyzing = True
-        self.status_label.configure(text="Analyzing...")
-        self.analyze_btn.configure(state="disabled", text="Analyzing...")
-        
-        # Simulate analysis (replace with actual model inference)
-        self.root.after(1500, self._complete_analysis)
-        
-    def _complete_analysis(self):
-        """Simulate analysis completion - replace with actual results"""
-        import random
-        
-        # Simulate result (replace with model prediction)
-        is_fake = random.choice([True, False])
-        confidence = random.uniform(75, 98)
-        
-        if is_fake:
-            self.prediction_label.configure(
-                text="FAKE NEWS",
-                text_color=self.colors["danger"]
-            )
-            self.confidence_bar.configure(progress_color=self.colors["danger"])
-        else:
-            self.prediction_label.configure(
-                text="REAL NEWS",
-                text_color=self.colors["success"]
-            )
-            self.confidence_bar.configure(progress_color=self.colors["success"])
-            
-        self.confidence_label.configure(text=f"{confidence:.1f}%")
-        self.confidence_bar.set(confidence / 100)
-        self.status_label.configure(text="Analysis complete")
-        
-        self.is_analyzing = False
-        self.analyze_btn.configure(state="normal", text="Analyze News")
-        
-    def fetch_live_news(self):
-        """Placeholder for live news fetching from API"""
-        self.status_label.configure(text="Fetching news from API...")
-        # TODO: Implement API integration
-        messagebox.showinfo("API Integration", "Live news fetching will be implemented here.")
-        self.status_label.configure(text="Ready")
 
-# Application entry point
+    # ==========================
+    # MODEL INFERENCE
+    # ==========================
+
+    def analyze_news(self):
+        text_content = self.text_input.get("1.0", "end-1c").strip()
+
+        if not text_content:
+            messagebox.showwarning("Input Required", "Please enter a news article.")
+            return
+
+        self.status_label.configure(text="Analyzing...")
+        self.analyze_btn.configure(state="disabled")
+
+        try:
+            cleaned = clean_text(text_content)
+            vector = self.vectorizer.transform([cleaned])
+
+            prediction = self.model.predict(vector)[0]
+            probability = self.model.predict_proba(vector)[0].max()
+
+            if prediction == 1:
+                label = "FAKE NEWS"
+                color = self.colors["danger"]
+            else:
+                label = "REAL NEWS"
+                color = self.colors["success"]
+
+            self.prediction_label.configure(text=label, text_color=color)
+            self.confidence_label.configure(text=f"{probability*100:.1f}%")
+            self.confidence_bar.set(probability)
+
+            self.status_label.configure(text="Analysis complete")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Inference failed:\n{str(e)}")
+            self.status_label.configure(text="Error occurred")
+
+        self.analyze_btn.configure(state="normal")
+
+    # ==========================
+    # API INTEGRATION
+    # ==========================
+
+    def fetch_live_news(self):
+        if not self.api_key:
+            messagebox.showerror("API Error", "NEWS_API_KEY not found in .env file.")
+            return
+
+        self.status_label.configure(text="Fetching news...")
+
+        try:
+            url = "https://newsapi.org/v2/top-headlines"
+            params = {
+                "country": "us",
+                "pageSize": 1,
+                "apiKey": self.api_key
+            }
+
+            response = requests.get(url, params=params)
+            data = response.json()
+
+            if data["status"] != "ok":
+                messagebox.showerror("API Error", data.get("message", "Unknown error"))
+                return
+
+            article = data["articles"][0]
+            content = (article.get("title", "") or "") + " " + (article.get("description", "") or "")
+
+            self.text_input.delete("1.0", "end")
+            self.text_input.insert("1.0", content)
+
+            self.status_label.configure(text="News fetched successfully")
+
+        except Exception as e:
+            messagebox.showerror("API Error", str(e))
+            self.status_label.configure(text="Error fetching news")
+
+
 if __name__ == "__main__":
     root = ctk.CTk()
     app = FakeNewsDetectionApp(root)
