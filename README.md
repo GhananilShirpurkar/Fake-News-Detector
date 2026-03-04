@@ -18,6 +18,10 @@
 
 [Features](#️-desktop-application) · [Installation](#-installation) · [Usage](#-running-the-application) · [Pipeline](#-machine-learning-pipeline) · [Performance](#-model-performance)
 
+<p align="center">
+⭐ If you find this project interesting, consider starring the repository.
+</p>
+
 </div>
 
 ---
@@ -33,6 +37,11 @@
 | ![Main Interface](assets/screenshot-main.png) | ![Analysis Results](assets/screenshot-results.png) |
 
 </div>
+
+> **How to add your screenshots:**
+> 1. Create an `assets/` folder in the project root
+> 2. Save your screenshots as `assets/screenshot-main.png` and `assets/screenshot-results.png`
+> 3. Delete this tip block — the images will render automatically on GitHub
 
 ---
 
@@ -194,15 +203,11 @@ Integrates with [NewsAPI](https://newsapi.org/) to fetch live top headlines. Ana
 ```
 fake-news-detector/
 │
-├── assets/                    ← screenshots & images 
+├── assets/                    ← screenshots & images for README
 │
-├── data/
-│   ├── Fake.csv
-│   └── True.csv
+├── data/                      ← dataset location (not tracked in git)
 │
-├── models/
-│   ├── model.pkl
-│   └── vectorizer.pkl
+├── models/                    ← generated model artifacts (not tracked)
 │
 ├── src/
 │   ├── app.py                 ← desktop GUI
@@ -211,64 +216,107 @@ fake-news-detector/
 │   ├── utils.py               ← text preprocessing
 │   └── __init__.py
 │
-├── .env                       ← API keys 
+├── .env                       ← API keys (not committed)
 ├── requirements.txt
 ├── README.md
 ├── LICENSE
 └── .gitignore
 ```
 
+> The `data/` and `models/` directories are excluded from version control to keep the repository lightweight.
+
+---
+
+## 📥 Dataset Setup
+
+This project uses the **ISOT Fake News Dataset**.
+
+Download it from Kaggle:
+
+> 🔗 [https://www.kaggle.com/datasets/clmentbisaillon/fake-and-real-news-dataset](https://www.kaggle.com/datasets/clmentbisaillon/fake-and-real-news-dataset)
+
+After downloading, place the files inside the `data/` directory:
+
+```
+data/
+├── Fake.csv
+└── True.csv
+```
+
+> The dataset is not included in the repository because of size and licensing considerations.
+
 ---
 
 ## 🚀 Installation
 
-**1. Clone the repository**
+### 1️⃣ Clone the repository
 
 ```bash
 git clone https://github.com/GhananilShirpurkar/fake-news-detector.git
 cd fake-news-detector
 ```
 
-**2. Create & activate a virtual environment**
+### 2️⃣ Create a virtual environment
 
 ```bash
 python -m venv .venv
+```
 
-# macOS / Linux
+Activate it:
+
+```bash
+# Linux / macOS
 source .venv/bin/activate
 
 # Windows
 .venv\Scripts\activate
 ```
 
-**3. Install dependencies**
+### 3️⃣ Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-**4. Add your API key**
+### 4️⃣ Download the dataset
 
-```bash
-# create a .env file in the project root
-echo "NEWS_API_KEY=your_key_here" > .env
+Follow the instructions in the [Dataset Setup](#-dataset-setup) section above.
+
+### 5️⃣ Add your API key
+
+Create a `.env` file in the project root:
+
+```env
+NEWS_API_KEY=your_api_key_here
 ```
+
+> Get a free key at [https://newsapi.org](https://newsapi.org)
 
 ---
 
 ## 🏋️ Training the Model
 
+Run the training pipeline:
+
 ```bash
 python src/train.py
 ```
 
-This will:
+The training script will:
 
-1. Load and merge `Fake.csv` + `True.csv`
-2. Clean and vectorize all text
-3. Train Logistic Regression and Naive Bayes
-4. Run 5-fold cross-validation
-5. Save the best model → `models/model.pkl` + `models/vectorizer.pkl`
+1. Load and merge the dataset
+2. Clean and normalize the text
+3. Convert text to TF-IDF features
+4. Train Logistic Regression and Naive Bayes models
+5. Perform 5-fold cross-validation
+6. Automatically select the best performing model
+7. Save the trained artifacts to:
+
+```
+models/
+├── model.pkl
+└── vectorizer.pkl
+```
 
 ---
 
@@ -284,7 +332,7 @@ Paste any article into the input panel and press **Analyze** or `Ctrl+Enter`.
 
 ## ⚠️ Limitations
 
-This model detects **writing style patterns** — it cannot verify facts.
+This model detects **linguistic patterns** rather than factual truth. It learns stylistic signals common in fake news datasets but does not perform real-world fact verification.
 
 | Limitation | Impact |
 |------------|--------|
@@ -293,6 +341,16 @@ This model detects **writing style patterns** — it cannot verify facts.
 | Static vocabulary | Rare or emerging terms may be out-of-vocabulary |
 
 More capable systems would incorporate knowledge graphs, transformer models (BERT / RoBERTa), and live fact-checking APIs.
+
+---
+
+## 🔮 Future Improvements
+
+- [ ] Fine-tuned BERT / RoBERTa classifier
+- [ ] Real-time fact verification via external knowledge bases
+- [ ] Browser extension for inline detection while browsing
+- [ ] Multilingual support
+- [ ] Web deployment (FastAPI + React frontend)
 
 ---
 
