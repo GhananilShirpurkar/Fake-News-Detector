@@ -194,7 +194,7 @@ Integrates with [NewsAPI](https://newsapi.org/) to fetch live top headlines. Ana
 ```
 fake-news-detector/
 │
-├── assets/                    ← screenshots & images for README
+├── assets/                    ← screenshots & images 
 │
 ├── data/
 │   ├── Fake.csv
@@ -211,7 +211,7 @@ fake-news-detector/
 │   ├── utils.py               ← text preprocessing
 │   └── __init__.py
 │
-├── .env                       ← API keys (not committed)
+├── .env                       ← API keys 
 ├── requirements.txt
 ├── README.md
 ├── LICENSE
